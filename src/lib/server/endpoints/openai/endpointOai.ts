@@ -182,10 +182,13 @@ export async function endpointOai(
 						preprompt + (userSystemPrompt ? "\n\n" + userSystemPrompt : "");
 				}
 				// If no preprompt, user's system message remains unchanged
-			} else {
-				// No system message exists - create a new one with preprompt or empty string
-				messagesOpenAI = [{ role: "system", content: preprompt ?? "" }, ...messagesOpenAI];
+			} else if (preprompt && preprompt.trim()) {
+				// Only add a system message if preprompt has actual content
+				messagesOpenAI = [{ role: "system", content: preprompt }, ...messagesOpenAI];
 			}
+
+			// Clean up messages for better compatibility with OpenAI-compatible endpoints
+			messagesOpenAI = cleanupMessages(messagesOpenAI);
 
 			// Combine model defaults with request-specific parameters
 			const parameters = { ...model.parameters, ...generateSettings };
@@ -238,6 +241,37 @@ export async function endpointOai(
 	} else {
 		throw new Error("Invalid completion type");
 	}
+}
+
+/**
+ * Cleans up messages for better compatibility with OpenAI-compatible endpoints.
+ * - Removes messages with empty or whitespace-only content
+ * - Converts single-element text content arrays to plain strings
+ * - Preserves multimodal content arrays (with images)
+ */
+function cleanupMessages(
+	messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+	return messages
+		.filter((message) => {
+			// Filter out messages with empty content
+			if (!message.content) return false;
+			if (typeof message.content === "string") {
+				return message.content.trim().length > 0;
+			}
+			// Keep array content (multimodal)
+			return true;
+		})
+		.map((message) => {
+			// Convert single-element text content arrays to plain strings for better compatibility
+			if (Array.isArray(message.content) && message.content.length === 1) {
+				const firstPart = message.content[0];
+				if (firstPart && firstPart.type === "text") {
+					return { ...message, content: firstPart.text };
+				}
+			}
+			return message;
+		});
 }
 
 async function prepareMessages(
