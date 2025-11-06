@@ -8,11 +8,16 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 1. [Database Options](#database-options)
 2. [Launch](#launch)
 3. [Optional Docker Image](#optional-docker-image)
-4. [Extra parameters](#extra-parameters)
-5. [Building](#building)
+4. [Deploying on Hugging Face Spaces](#deploying-on-hugging-face-spaces)
+5. [Extra parameters](#extra-parameters)
+6. [Building](#building)
+7. [Troubleshooting](./TROUBLESHOOTING.md)
 
-> [!NOTE]
-> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
+> [!IMPORTANT]
+> **Breaking Change**: Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc.) will work by default.
+
+> [!WARNING]
+> **Text Generation Inference (TGI) is NOT built-in**: If you're getting "Failed to connect to 127.0.0.1 port 8080" errors, this means you're trying to use TGI which is no longer automatically started by Chat UI. See [Deploying on Hugging Face Spaces](#deploying-on-hugging-face-spaces) for solutions.
 
 > [!NOTE]
 > The old version is still available on the [legacy branch](https://github.com/huggingface/chat-ui/tree/legacy)
@@ -95,7 +100,7 @@ Prefer containerized setup? You can run everything in one container as long as y
 
 ```bash
 docker run \
-  -p 3000 \
+  -p 3000:3000 \
   -e MONGODB_URL=mongodb://host.docker.internal:27017 \
   -e OPENAI_BASE_URL=https://router.huggingface.co/v1 \
   -e OPENAI_API_KEY=hf_*** \
@@ -104,6 +109,83 @@ docker run \
 ```
 
 `host.docker.internal` lets the container reach a MongoDB instance on your host machine; swap it for your Atlas URI if you use the hosted option. All environment variables accepted in `.env.local` can be provided as `-e` flags.
+
+## Deploying on Hugging Face Spaces
+
+> [!IMPORTANT]
+> Chat UI **does not automatically start Text Generation Inference (TGI)**. You must configure an OpenAI-compatible endpoint.
+
+### Option 1: Use Hugging Face Inference API (Recommended)
+
+This is the simplest approach and doesn't require running TGI yourself:
+
+1. **Create a Space** with the Chat UI Docker image
+2. **Set these environment variables** in your Space settings:
+   ```env
+   OPENAI_BASE_URL=https://router.huggingface.co/v1
+   OPENAI_API_KEY=hf_your_token_here
+   MONGODB_URL=mongodb://your-mongodb-uri
+   ```
+3. **Get your HF token** from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+
+The Hugging Face Inference API provides access to many models without needing to host them yourself.
+
+### Option 2: Run TGI Separately
+
+If you want to use a specific model with TGI:
+
+1. **Create a TGI Space** (separate from Chat UI):
+   - Use the `text-generation-inference` Docker image
+   - Configure it with your desired model
+   - Note the Space URL (e.g., `https://your-username-tgi.hf.space`)
+
+2. **Create a Chat UI Space** and configure:
+   ```env
+   OPENAI_BASE_URL=https://your-username-tgi.hf.space/v1
+   OPENAI_API_KEY=any-string-here
+   MONGODB_URL=mongodb://your-mongodb-uri
+   ```
+
+### Option 3: Use Other OpenAI-Compatible Services
+
+You can point Chat UI to any OpenAI-compatible endpoint:
+
+- **Ollama**: `OPENAI_BASE_URL=http://your-ollama-host:11434/v1`
+- **llama.cpp**: `OPENAI_BASE_URL=http://your-llama-cpp-host:8080/v1`
+- **OpenRouter**: `OPENAI_BASE_URL=https://openrouter.ai/api/v1`
+- **vLLM**: `OPENAI_BASE_URL=http://your-vllm-host:8000/v1`
+
+### Troubleshooting
+
+**Error: "Failed to connect to 127.0.0.1 port 8080"**
+
+This error means something is trying to connect to TGI on port 8080, but TGI is not running. Solutions:
+
+1. **Use Hugging Face Inference API** (Option 1 above) - easiest solution
+2. **Run TGI separately** (Option 2 above) and point `OPENAI_BASE_URL` to it
+3. **Check your Space configuration** - ensure you're not using old TGI-specific settings
+
+**MongoDB Connection Issues**
+
+If you see MongoDB connection errors:
+
+1. Use a hosted MongoDB (MongoDB Atlas free tier works great)
+2. Or use the `chat-ui-db` image which includes MongoDB: `ghcr.io/huggingface/chat-ui-db:latest`
+3. Set `MONGODB_URL` to your MongoDB connection string
+
+**Models Not Showing Up**
+
+Chat UI fetches models from `${OPENAI_BASE_URL}/models`. Ensure:
+
+1. Your endpoint supports the `/v1/models` endpoint
+2. Your `OPENAI_API_KEY` is valid
+3. The endpoint is accessible from your deployment
+
+---
+
+**For more deployment scenarios and detailed guides**, see:
+- [DEPLOYMENT.md](./DEPLOYMENT.md) - Comprehensive deployment guide
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Quick solutions to common issues
 
 ## Extra parameters
 
