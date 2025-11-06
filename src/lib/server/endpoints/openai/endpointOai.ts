@@ -150,6 +150,8 @@ export async function endpointOai(
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+					...(locals?.user?._id ? { "X-User-ID": locals.user._id.toString() } : {}),
+					...(locals?.user?.email ? { "X-User-Email": locals.user.email } : {}),
 				},
 				signal: abortSignal,
 			});
@@ -214,6 +216,8 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(locals?.user?._id ? { "X-User-ID": locals.user._id.toString() } : {}),
+							...(locals?.user?.email ? { "X-User-Email": locals.user.email } : {}),
 						},
 						signal: abortSignal,
 					}
@@ -228,6 +232,8 @@ export async function endpointOai(
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
+							...(locals?.user?._id ? { "X-User-ID": locals.user._id.toString() } : {}),
+							...(locals?.user?.email ? { "X-User-Email": locals.user.email } : {}),
 						},
 						signal: abortSignal,
 					}

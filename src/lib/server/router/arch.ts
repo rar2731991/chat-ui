@@ -152,6 +152,8 @@ export async function archSelectRoute(
 	const headers: HeadersInit = {
 		Authorization: `Bearer ${getApiToken(locals)}`,
 		"Content-Type": "application/json",
+		...(locals?.user?._id ? { "X-User-ID": locals.user._id.toString() } : {}),
+		...(locals?.user?.email ? { "X-User-Email": locals.user.email } : {}),
 	};
 	const body = {
 		model: archModel,
