@@ -20,9 +20,11 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import IconDownload from "$lib/components/icons/IconDownload.svelte";
 	import { shareModal } from "$lib/stores/shareModal";
 	import BackgroundGenerationPoller from "$lib/components/BackgroundGenerationPoller.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { downloadConversation } from "$lib/utils/downloadConversation";
 
 	let { data = $bindable(), children } = $props();
 
@@ -63,6 +65,12 @@
 			page.route.id?.startsWith("/conversation/")
 	);
 
+	let canDownload = $derived(
+		Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/") &&
+			page.data?.messages?.length > 0
+	);
+
 	async function deleteConversation(id: string) {
 		client
 			.conversations({ id })
@@ -98,6 +106,19 @@
 	function closeWelcomeModal() {
 		if (requireAuthUser()) return;
 		settings.set({ welcomeModalSeen: true });
+	}
+
+	function handleDownload() {
+		if (!canDownload) return;
+		const title = conversations.find((conv) => conv.id === page.params.id)?.title || "Conversation";
+		downloadConversation(
+			{
+				title,
+				messages: page.data?.messages || [],
+				model: page.data?.model,
+			},
+			"markdown"
+		);
 	}
 
 	onDestroy(() => {
@@ -244,20 +265,38 @@
 			: 'left-0'} *:transition-transform"
 	/>
 
-	{#if canShare}
-		<button
-			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
-				{$loading ? 'cursor-not-allowed opacity-40' : ''}"
-			onclick={() => shareModal.open()}
-			aria-label="Share conversation"
-			disabled={$loading}
-		>
-			<IconShare />
-		</button>
-	{/if}
+	<div class="hidden md:absolute md:right-6 md:top-5 md:flex md:gap-2">
+		{#if canDownload}
+			<button
+				type="button"
+				class="size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:flex
+					{$loading ? 'cursor-not-allowed opacity-40' : ''}"
+				onclick={handleDownload}
+				aria-label="Download conversation"
+				disabled={$loading}
+			>
+				<IconDownload />
+			</button>
+		{/if}
+		{#if canShare}
+			<button
+				type="button"
+				class="size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:flex
+					{$loading ? 'cursor-not-allowed opacity-40' : ''}"
+				onclick={() => shareModal.open()}
+				aria-label="Share conversation"
+				disabled={$loading}
+			>
+				<IconShare />
+			</button>
+		{/if}
+	</div>
 
-	<MobileNav title={mobileNavTitle}>
+	<MobileNav
+		title={mobileNavTitle}
+		messages={page.data?.messages}
+		model={page.data?.model}
+	>
 		<NavMenu
 			{conversations}
 			user={data.user}

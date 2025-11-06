@@ -13,17 +13,22 @@
 	import { page } from "$app/state";
 	import IconNew from "$lib/components/icons/IconNew.svelte";
 	import IconShare from "$lib/components/icons/IconShare.svelte";
+	import IconDownload from "$lib/components/icons/IconDownload.svelte";
 	import IconBurger from "$lib/components/icons/IconBurger.svelte";
 	import { Spring } from "svelte/motion";
 	import { shareModal } from "$lib/stores/shareModal";
 	import { loading } from "$lib/stores/loading";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { downloadConversation } from "$lib/utils/downloadConversation";
+	import type { Message } from "$lib/types/Message";
 	interface Props {
 		title: string | undefined;
 		children?: import("svelte").Snippet;
+		messages?: Message[];
+		model?: string;
 	}
 
-	let { title = $bindable(), children }: Props = $props();
+	let { title = $bindable(), children, messages = [], model }: Props = $props();
 
 	let closeEl: HTMLButtonElement | undefined = $state();
 	let openEl: HTMLButtonElement | undefined = $state();
@@ -34,6 +39,12 @@
 			!$loading &&
 			Boolean(page.params?.id) &&
 			page.route.id?.startsWith("/conversation/")
+	);
+	const canDownload = $derived(
+		!$loading &&
+			Boolean(page.params?.id) &&
+			page.route.id?.startsWith("/conversation/") &&
+			messages.length > 0
 	);
 
 	// Define the width for the drawer (less than 100% to create the gap)
@@ -72,6 +83,19 @@
 	function closeDrawer() {
 		isOpen = false;
 	}
+
+	// Function to handle download
+	function handleDownload() {
+		if (!canDownload || !title) return;
+		downloadConversation(
+			{
+				title,
+				messages,
+				model,
+			},
+			"markdown"
+		);
+	}
 </script>
 
 <nav
@@ -92,6 +116,15 @@
 		{/if}
 	</div>
 	<div class="flex items-center">
+		<button
+			type="button"
+			class="flex size-8 shrink-0 items-center justify-center text-lg"
+			disabled={!canDownload}
+			onclick={handleDownload}
+			aria-label="Download conversation"
+		>
+			<IconDownload classNames={!canDownload ? "opacity-40" : ""} />
+		</button>
 		{#if isHuggingChat}
 			<button
 				type="button"
