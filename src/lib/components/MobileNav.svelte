@@ -49,6 +49,29 @@
 		{ stiffness: 0.2, damping: 0.8 }
 	);
 
+	// Track if drawer should be rendered (open or animating)
+	let shouldRenderDrawer = $state(false);
+	let isAnimating = $state(false);
+
+	// Determine if drawer is fully closed
+	const isFullyClosed = $derived(tween.current <= -99.9);
+
+	$effect(() => {
+		if (isOpen) {
+			shouldRenderDrawer = true;
+			isAnimating = true;
+		} else if (isFullyClosed) {
+			isAnimating = false;
+			// Small delay to ensure animation completes before unmounting
+			const timeout = setTimeout(() => {
+				if (!isOpen) {
+					shouldRenderDrawer = false;
+				}
+			}, 50);
+			return () => clearTimeout(timeout);
+		}
+	});
+
 	$effect(() => {
 		title ??= "New Chat";
 	});
@@ -121,24 +144,27 @@
 </nav>
 
 <!-- Mobile drawer overlay - shows when drawer is open -->
-{#if isOpen}
+{#if shouldRenderDrawer}
 	<button
 		type="button"
 		class="fixed inset-0 z-20 cursor-default bg-black/30 md:hidden"
-		style="opacity: {Math.max(0, Math.min(1, (100 + tween.current) / 100))};"
+		style="opacity: {Math.max(0, Math.min(1, (100 + tween.current) / 100))}; pointer-events: {isOpen ? 'auto' : 'none'};"
 		onclick={closeDrawer}
 		aria-label="Close mobile navigation"
 	></button>
 {/if}
 
-<nav
-	style="transform: translateX({Math.max(
-		-100,
-		Math.min(0, tween.current)
-	)}%); width: {drawerWidthPercentage}%;"
-	class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen}
-	class="fixed bottom-0 left-0 top-0 z-30 grid max-h-screen grid-cols-1
-	grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
->
-	{@render children?.()}
-</nav>
+{#if shouldRenderDrawer}
+	<nav
+		style="transform: translate3d({Math.max(
+			-100,
+			Math.min(0, tween.current)
+		)}%, 0, 0); width: {drawerWidthPercentage}%; will-change: transform; visibility: {isFullyClosed ? 'hidden' : 'visible'};"
+		class:shadow-[5px_0_15px_0_rgba(0,0,0,0.3)]={isOpen}
+		class="fixed bottom-0 left-0 top-0 z-30 grid max-h-screen grid-cols-1
+		grid-rows-[auto,1fr,auto,auto] rounded-r-xl bg-white pt-4 dark:bg-gray-900 md:hidden"
+		style:pointer-events={isFullyClosed ? "none" : "auto"}
+	>
+		{@render children?.()}
+	</nav>
+{/if}
