@@ -538,6 +538,9 @@ export async function POST({ request, locals, params, getClientAddress }) {
 	return new Response(stream, {
 		headers: {
 			"Content-Type": "application/jsonl",
+			"Cache-Control": "no-cache, no-transform",
+			"X-Accel-Buffering": "no",
+			Connection: "keep-alive",
 		},
 	});
 }
