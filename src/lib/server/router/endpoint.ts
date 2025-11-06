@@ -9,9 +9,11 @@ import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import { archSelectRoute } from "./arch";
+import { vllmSelectRoute } from "./vllm-semantic-router";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
 import { ROUTER_FAILURE } from "./types";
+import type { RouteSelection } from "./types";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -156,13 +158,20 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		async function* metadataThenStream(
 			gen: AsyncGenerator<TextGenerationStreamOutputSimplified>,
 			actualModel: string,
-			selectedRoute: string
+			selectedRoute: string,
+			routeSelection?: RouteSelection,
+			routerType?: "omni" | "mom"
 		) {
 			yield {
 				token: { id: 0, text: "", special: true, logprob: 0 },
 				generated_text: null,
 				details: null,
-				routerMetadata: { route: selectedRoute, model: actualModel },
+				routerMetadata: {
+					route: selectedRoute,
+					model: actualModel,
+					...(routeSelection?.cotMetadata && { cot: routeSelection.cotMetadata }),
+					...(routerType && { routerType }),
+				},
 			};
 			for await (const ev of gen) yield ev;
 		}
@@ -230,18 +239,54 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			}
 		}
 
-		const routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+		// Determine which router to use based on model configuration
+		// Check if this is a MoM router (via model id/name or alias)
+		const isMomRouter =
+			routerModel.id === "mom" ||
+			routerModel.name === "MoM" ||
+			routerModel.id === config.PUBLIC_LLM_ROUTER_MOM_ALIAS_ID;
 
-		// If arch router failed with an error, only hard-fail for policy errors (402/401/403)
+		let routeSelection: RouteSelection;
+		let routerType: "omni" | "mom";
+
+		if (isMomRouter) {
+			// Use vLLM Semantic Router (MoM)
+			routerType = "mom";
+			routeSelection = await vllmSelectRoute(sanitizedMessages, undefined, params.locals);
+
+			// If MoM router failed, try falling back to Arch router if configured
+			if (
+				routeSelection.routeName === "mom_router_failure" &&
+				routeSelection.error &&
+				config.LLM_ROUTER_ARCH_BASE_URL
+			) {
+				logger.warn(
+					{ err: routeSelection.error.message },
+					"[router] MoM router failed, falling back to Arch router"
+				);
+				routerType = "omni";
+				routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+			}
+		} else {
+			// Use Arch router (Omni)
+			routerType = "omni";
+			routeSelection = await archSelectRoute(sanitizedMessages, undefined, params.locals);
+		}
+
+		// If router failed with an error, only hard-fail for policy errors (402/401/403)
 		// For transient errors (5xx, timeouts, network), allow fallback to continue
-		if (routeSelection.routeName === ROUTER_FAILURE && routeSelection.error) {
+		const isRouterFailure =
+			routeSelection.routeName === ROUTER_FAILURE ||
+			routeSelection.routeName === "mom_router_failure";
+
+		if (isRouterFailure && routeSelection.error) {
 			const { message, statusCode } = routeSelection.error;
 
 			if (isPolicyError(statusCode)) {
 				// Policy errors should be surfaced to the user immediately (e.g., subscription required)
 				logger.error(
 					{ err: message, ...(statusCode && { status: statusCode }) },
-					"[router] arch router failed with policy error, propagating to client"
+					"[router] router failed with policy error, propagating to client"
 				);
 				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
 			}
@@ -249,7 +294,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			// Transient errors: log and continue to fallback
 			logger.warn(
 				{ err: message, ...(statusCode && { status: statusCode }) },
-				"[router] arch router failed with transient error, attempting fallback"
+				"[router] router failed with transient error, attempting fallback"
 			);
 		}
 
@@ -260,12 +305,18 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		for (const candidate of candidates) {
 			try {
 				logger.info(
-					{ route: routeSelection.routeName, model: candidate },
+					{ route: routeSelection.routeName, model: candidate, routerType },
 					"[router] trying candidate"
 				);
 				const ep = await createCandidateEndpoint(candidate);
 				const gen = await ep({ ...params });
-				return metadataThenStream(gen, candidate, routeSelection.routeName);
+				return metadataThenStream(
+					gen,
+					candidate,
+					routeSelection.routeName,
+					routeSelection,
+					routerType
+				);
 			} catch (e) {
 				lastErr = e;
 				const { message: errMsg, statusCode: errStatus } = extractUpstreamError(e);

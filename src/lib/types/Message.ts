@@ -2,6 +2,7 @@ import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { v4 } from "uuid";
+import type { CotMetadata } from "$lib/server/router/types";
 
 export type Message = Partial<Timestamps> & {
 	from: "user" | "assistant" | "system";
@@ -22,6 +23,10 @@ export type Message = Partial<Timestamps> & {
 		route: string;
 		model: string;
 		provider?: InferenceProvider;
+		// Chain-of-Thought metadata from vLLM Semantic Router (MoM)
+		cot?: CotMetadata;
+		// Which router was used
+		routerType?: "omni" | "mom";
 	};
 
 	// needed for conversation trees
