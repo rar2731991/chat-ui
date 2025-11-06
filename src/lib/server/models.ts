@@ -291,6 +291,75 @@ const applyModelState = (newModels: ProcessedModel[], startedAt: number): Models
 	return summary;
 };
 
+/**
+ * Fetch with retry logic and exponential backoff for handling rate limits and transient errors
+ */
+const fetchWithRetry = async (
+	url: string,
+	options: RequestInit = {},
+	maxRetries = 5,
+	initialDelayMs = 1000,
+	maxDelayMs = 30000
+): Promise<Response> => {
+	let lastError: Error | null = null;
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			const response = await fetch(url, options);
+
+			// Retry on rate limit (429) and server errors (500, 502, 503, 504)
+			const shouldRetry =
+				attempt < maxRetries &&
+				(response.status === 429 ||
+					response.status === 500 ||
+					response.status === 502 ||
+					response.status === 503 ||
+					response.status === 504);
+
+			if (shouldRetry) {
+				const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt), maxDelayMs);
+				logger.warn(
+					{
+						attempt: attempt + 1,
+						maxRetries: maxRetries + 1,
+						status: response.status,
+						statusText: response.statusText,
+						delayMs,
+						url,
+					},
+					"[models] Retrying fetch due to transient error"
+				);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+				continue;
+			}
+
+			return response;
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+
+			if (attempt < maxRetries) {
+				const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt), maxDelayMs);
+				logger.warn(
+					{
+						attempt: attempt + 1,
+						maxRetries: maxRetries + 1,
+						error: lastError.message,
+						delayMs,
+						url,
+					},
+					"[models] Retrying fetch due to network error"
+				);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+				continue;
+			}
+
+			throw lastError;
+		}
+	}
+
+	throw lastError || new Error("Failed to fetch after retries");
+};
+
 const buildModels = async (): Promise<ProcessedModel[]> => {
 	if (!openaiBaseUrl) {
 		logger.error(
@@ -308,7 +377,7 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 
 		// Use auth token from the start if available to avoid rate limiting issues
 		// Some APIs rate-limit unauthenticated requests more aggressively
-		const response = await fetch(`${baseURL}/models`, {
+		const response = await fetchWithRetry(`${baseURL}/models`, {
 			headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
 		});
 		logger.info({ status: response.status }, "[models] First fetch status");
