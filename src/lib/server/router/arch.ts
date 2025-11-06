@@ -4,6 +4,7 @@ import type { EndpointMessage } from "../endpoints/endpoints";
 import type { Route, RouteConfig, RouteSelection } from "./types";
 import { getRoutes } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
+import { proxyFetch } from "$lib/server/proxy";
 
 const DEFAULT_LAST_TURNS = 16;
 
@@ -166,7 +167,7 @@ export async function archSelectRoute(
 	const to = setTimeout(() => ctrl.abort(), timeoutMs);
 
 	try {
-		const resp = await fetch(`${baseURL}/chat/completions`, {
+		const resp = await proxyFetch(`${baseURL}/chat/completions`, {
 			method: "POST",
 			headers,
 			body: JSON.stringify(body),

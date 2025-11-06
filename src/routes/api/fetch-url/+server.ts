@@ -1,6 +1,6 @@
 import { error } from "@sveltejs/kit";
 import { logger } from "$lib/server/logger.js";
-import { fetch } from "undici";
+import { proxyFetch } from "$lib/server/proxy.js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT = 30000; // 30 seconds
@@ -49,7 +49,7 @@ export async function GET({ url }) {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-		const response = await fetch(targetUrl, {
+		const response = await proxyFetch(targetUrl, {
 			signal: controller.signal,
 			headers: {
 				"User-Agent": "HuggingChat-Attachment-Fetcher/1.0",

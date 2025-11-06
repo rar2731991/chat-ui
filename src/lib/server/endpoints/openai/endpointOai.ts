@@ -17,6 +17,7 @@ import { createImageProcessorOptionsValidator, makeImageProcessor } from "../ima
 import { TEXT_MIME_ALLOWLIST } from "$lib/constants/mime";
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
+import { proxyFetch } from "$lib/server/proxy";
 // uuid import removed (no tool call ids)
 
 export const endpointOAIParametersSchema = z.object({
@@ -78,9 +79,9 @@ export async function endpointOai(
 	// Store router metadata if captured
 	let routerMetadata: { route?: string; model?: string; provider?: string } = {};
 
-	// Custom fetch wrapper to capture response headers for router metadata
+	// Custom fetch wrapper to capture response headers for router metadata and use proxy
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, init);
+		const response = await proxyFetch(url, init);
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");

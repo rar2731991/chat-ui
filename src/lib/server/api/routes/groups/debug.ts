@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { config } from "$lib/server/config";
+import { proxyFetch } from "$lib/server/proxy";
 
 export const debugGroup = new Elysia().group("/debug", (app) =>
 	app
@@ -18,7 +19,7 @@ export const debugGroup = new Elysia().group("/debug", (app) =>
 				/\/$/,
 				""
 			);
-			const res = await fetch(`${base}/models`);
+			const res = await proxyFetch(`${base}/models`);
 			const body = await res.text();
 			let parsed: unknown;
 			try {
