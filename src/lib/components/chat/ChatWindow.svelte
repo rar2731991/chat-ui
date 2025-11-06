@@ -13,6 +13,7 @@
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
+	import { page } from "$app/state";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
@@ -473,7 +474,7 @@
 				}}
 			>
 				{#if onDrag && isFileUploadEnabled}
-					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} maxFileSize={parseInt(page.data.publicConfig.PUBLIC_MAX_FILE_SIZE || "10485760")} />
 				{:else}
 					<div
 						class="flex w-full flex-1 rounded-xl border-none bg-transparent"

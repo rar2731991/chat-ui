@@ -23,6 +23,7 @@ import type { TextGenerationContext } from "$lib/server/textGeneration/types";
 import { logger } from "$lib/server/logger.js";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { MetricsServer } from "$lib/server/metrics";
+import { getMaxFileSize } from "$lib/server/config";
 
 export async function POST({ request, locals, params, getClientAddress }) {
 	const id = z.string().parse(params.id);
@@ -180,9 +181,10 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}) ?? [];
 
 	// check sizes
-	// todo: make configurable
-	if (b64Files.some((file) => file.size > 10 * 1024 * 1024)) {
-		error(413, "File too large, should be <10MB");
+	const maxFileSize = getMaxFileSize();
+	if (b64Files.some((file) => file.size > maxFileSize)) {
+		const maxFileSizeMB = Math.floor(maxFileSize / (1024 * 1024));
+		error(413, `File too large, should be <${maxFileSizeMB}MB`);
 	}
 
 	const uploadedFiles = await Promise.all(b64Files.map((file) => uploadFile(file, conv))).then(

@@ -8,6 +8,7 @@
 		mimeTypes?: string[];
 		onDrag?: boolean;
 		onDragInner?: boolean;
+		maxFileSize?: number;
 	}
 
 	let {
@@ -15,6 +16,7 @@
 		mimeTypes = [],
 		onDrag = $bindable(false),
 		onDragInner = $bindable(false),
+		maxFileSize = 10 * 1024 * 1024, // Default to 10MB for backward compatibility
 	}: Props = $props();
 
 	async function dropHandle(event: DragEvent) {
@@ -50,9 +52,9 @@
 							return;
 						}
 
-						// if file is bigger than 10MB abort
-						if (file.size > 10 * 1024 * 1024) {
-							setErrorMsg("Some file is too big. (10MB max)");
+						// if file is bigger than maxFileSize abort
+						if (file.size > maxFileSize) {
+							setErrorMsg(`Some file is too big. (${Math.floor(maxFileSize / (1024 * 1024))}MB max)`);
 							files = [];
 							return;
 						}

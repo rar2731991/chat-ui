@@ -136,9 +136,15 @@ class ConfigManager {
 
 		const publicEnvKeys = Object.keys(publicEnv);
 
-		return Object.fromEntries(
+		const publicConfig = Object.fromEntries(
 			Object.entries(config).filter(([key]) => publicEnvKeys.includes(key))
 		) as Record<PublicConfigKey, string>;
+
+		// Add max file size to public config (not an env var, but computed from BODY_SIZE_LIMIT)
+		return {
+			...publicConfig,
+			PUBLIC_MAX_FILE_SIZE: getMaxFileSize().toString(),
+		};
 	}
 }
 
@@ -181,3 +187,19 @@ export const config: ConfigProxy = new Proxy(configManager, {
 		return false;
 	},
 }) as ConfigProxy;
+
+/**
+ * Get the maximum file size allowed for uploads in bytes.
+ * Reads from BODY_SIZE_LIMIT env var, defaults to 10MB for backward compatibility.
+ */
+export function getMaxFileSize(): number {
+	const bodySizeLimit = config.BODY_SIZE_LIMIT;
+	if (bodySizeLimit) {
+		const parsed = parseInt(bodySizeLimit, 10);
+		if (!isNaN(parsed) && parsed > 0) {
+			return parsed;
+		}
+	}
+	// Default to 10MB for backward compatibility
+	return 10 * 1024 * 1024;
+}
