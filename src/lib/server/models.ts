@@ -130,14 +130,23 @@ const addEndpoint = (m: Awaited<ReturnType<typeof processModel>>) => ({
 	...m,
 	getEndpoint: async (): Promise<Endpoint> => {
 		if (!m.endpoints || m.endpoints.length === 0) {
-			throw new Error("No endpoints configured. This build requires OpenAI-compatible endpoints.");
+			throw new Error(
+				"No endpoints configured. This build requires OpenAI-compatible or ACP endpoints."
+			);
 		}
-		// Only support OpenAI-compatible endpoints in this build
+		// Support both OpenAI and ACP endpoints
 		const endpoint = m.endpoints[0];
-		if (endpoint.type !== "openai") {
-			throw new Error("Only 'openai' endpoint type is supported in this build");
+		if (endpoint.type === "openai") {
+			return await endpoints.openai({ ...endpoint, model: m });
+		} else if (endpoint.type === "acp") {
+			return await endpoints.acp({ ...endpoint, model: m });
+		} else {
+			// TypeScript exhaustiveness check
+			const endpointType = (endpoint as { type: string }).type;
+			throw new Error(
+				`Unsupported endpoint type: ${endpointType}. Only 'openai' and 'acp' are supported.`
+			);
 		}
-		return await endpoints.openai({ ...endpoint, model: m });
 	},
 });
 

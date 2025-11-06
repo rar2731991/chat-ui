@@ -12,7 +12,7 @@ A chat interface for LLMs. It is a SvelteKit app and it powers the [HuggingChat 
 5. [Building](#building)
 
 > [!NOTE]
-> Chat UI only supports OpenAI-compatible APIs via `OPENAI_BASE_URL` and the `/models` endpoint. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc. will work by default).
+> Chat UI supports both OpenAI-compatible APIs via `OPENAI_BASE_URL` and Agent Communication Protocol (ACP) for agent-to-agent communication. Provider-specific integrations (legacy `MODELS` env var, GGUF discovery, embeddings, web-search helpers, etc.) are removed, but any service that speaks the OpenAI protocol (llama.cpp server, Ollama, OpenRouter, etc.) or ACP will work by default.
 
 > [!NOTE]
 > The old version is still available on the [legacy branch](https://github.com/huggingface/chat-ui/tree/legacy)
@@ -141,6 +141,60 @@ When you select Omni in the UI, Chat UI will:
 - Call the Arch endpoint once (non-streaming) to pick the best route for the last turns.
 - Emit RouterMetadata immediately (route and actual model used) so the UI can display it.
 - Stream from the selected model via your configured `OPENAI_BASE_URL`. On errors, it tries route fallbacks.
+
+## Agent Communication Protocol (ACP) Support
+
+Chat UI now supports the Agent Communication Protocol (ACP), an open standard for AI agent collaboration backed by the Linux Foundation. ACP enables seamless communication between agents built with different frameworks.
+
+### What is ACP?
+
+ACP is a REST-based protocol that standardizes how AI agents communicate with each other. Unlike OpenAI's API which is designed for single model interactions, ACP is built for multi-agent systems where agents can collaborate across different teams, frameworks, and organizations.
+
+### Configuring ACP
+
+To use ACP agents in Chat UI, configure the following environment variables:
+
+```env
+ACP_ENABLED=true
+ACP_BASE_URL=http://localhost:8000  # Your ACP agent server URL
+ACP_API_KEY=your_api_key_here       # Optional authentication
+```
+
+### Using ACP with Models
+
+You can configure models to use ACP endpoints by setting the endpoint type to `acp` in your model configuration:
+
+```json
+{
+	"id": "my-acp-agent",
+	"name": "My ACP Agent",
+	"displayName": "Custom Agent",
+	"description": "An ACP-compliant agent",
+	"endpoints": [
+		{
+			"type": "acp",
+			"baseURL": "http://localhost:8000",
+			"agentId": "my-agent",
+			"streamingSupported": true
+		}
+	]
+}
+```
+
+### ACP vs OpenAI API
+
+| Feature        | OpenAI API                   | ACP                         |
+| -------------- | ---------------------------- | --------------------------- |
+| Purpose        | Single model interaction     | Multi-agent collaboration   |
+| Protocol       | REST with proprietary format | REST with open standard     |
+| Communication  | Synchronous with streaming   | Async-first, sync supported |
+| Vendor Lock-in | OpenAI-specific              | Vendor-neutral              |
+| Use Case       | AI model queries             | Agent orchestration         |
+
+### Learn More
+
+- [ACP Specification](https://github.com/NisalGunawardhana/Agent-Communication-Protocol)
+- [DeepLearning.AI ACP Course](https://www.deeplearning.ai/short-courses/acp-agent-communication-protocol/)
 
 ## Building
 
