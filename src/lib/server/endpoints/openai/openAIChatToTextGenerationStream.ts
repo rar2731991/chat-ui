@@ -1,6 +1,7 @@
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
+import { logger } from "$lib/server/logger";
 
 /**
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
@@ -54,7 +55,11 @@ export async function* openAIChatToTextGenerationStream(
 			reasoning?: string;
 			reasoning_content?: string;
 		} = choices?.[0]?.delta ?? {};
-		const content: string = delta.content ?? "";
+
+		// Handle null content more robustly for custom OpenAI-compatible endpoints
+		const content: string =
+			delta.content !== null && delta.content !== undefined ? delta.content : "";
+
 		const reasoning: string =
 			typeof delta?.reasoning === "string"
 				? (delta.reasoning as string)
@@ -175,7 +180,24 @@ export async function* openAIChatToTextGenerationSingle(
 		reasoning?: string;
 		reasoning_content?: string;
 	} = completion.choices?.[0]?.message ?? {};
-	let content: string = message?.content || "";
+
+	// Handle null, undefined, and empty content more robustly
+	// Some custom OpenAI-compatible endpoints may return null instead of a string
+	let content: string = "";
+	if (message?.content !== null && message?.content !== undefined) {
+		content = message.content;
+	} else if (message?.content === null) {
+		// Log when content is explicitly null to help debug custom endpoint issues
+		logger.warn(
+			{
+				hasMessage: !!message,
+				messageKeys: message ? Object.keys(message) : [],
+				choicesLength: completion.choices?.length,
+			},
+			"OpenAI completion returned null content. This may indicate an issue with the custom endpoint response format."
+		);
+	}
+
 	// Provider-dependent reasoning shapes (non-streaming)
 	const r: string =
 		typeof message?.reasoning === "string"
