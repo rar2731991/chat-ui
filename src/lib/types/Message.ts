@@ -24,12 +24,22 @@ export type Message = Partial<Timestamps> & {
 		provider?: InferenceProvider;
 	};
 
+	// Reasoning steps for progressive display
+	reasoningSteps?: ReasoningStep[];
+	reasoningStatus?: string;
+	isThinking?: boolean;
+
 	// needed for conversation trees
 	ancestors?: Message["id"][];
 
 	// goes one level deep
 	children?: Message["id"][];
 };
+
+export interface ReasoningStep {
+	summary: string;
+	timestamp: number;
+}
 
 export type MessageFile = {
 	type: "hash" | "base64";

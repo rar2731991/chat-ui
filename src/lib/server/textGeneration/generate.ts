@@ -1,8 +1,13 @@
-import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import {
+	MessageUpdateType,
+	MessageReasoningUpdateType,
+	type MessageUpdate,
+} from "$lib/types/MessageUpdate";
 import { AbortedGenerations } from "../abortedGenerations";
 import type { TextGenerationContext } from "./types";
 import type { EndpointMessage } from "../endpoints/endpoints";
 import { logger } from "../logger";
+import { ReasoningSummarizer } from "./reasoningSummarizer";
 
 type GenerateContext = Omit<TextGenerationContext, "messages"> & { messages: EndpointMessage[] };
 
@@ -30,6 +35,9 @@ export async function* generate(
 		locals,
 		abortSignal: abortController.signal,
 	});
+
+	// Initialize reasoning summarizer
+	const reasoningSummarizer = new ReasoningSummarizer();
 
 	for await (const output of stream) {
 		// Check if this output contains router metadata
@@ -70,6 +78,28 @@ export async function* generate(
 
 		// ignore special tokens
 		if (output.token.special) continue;
+
+		// Process token for reasoning summarization
+		const reasoningResult = reasoningSummarizer.processToken(output.token.text);
+
+		// Emit reasoning step update if a new step was detected
+		if (reasoningResult.shouldEmitStep && reasoningResult.step) {
+			yield {
+				type: MessageUpdateType.Reasoning,
+				subtype: MessageReasoningUpdateType.Stream,
+				token: reasoningResult.step.summary,
+			};
+		}
+
+		// Emit reasoning status updates periodically
+		if (reasoningSummarizer.isThinking()) {
+			const status = reasoningSummarizer.getCurrentStatus();
+			yield {
+				type: MessageUpdateType.Reasoning,
+				subtype: MessageReasoningUpdateType.Status,
+				status,
+			};
+		}
 
 		// yield normal token
 		yield { type: MessageUpdateType.Stream, token: output.token.text };

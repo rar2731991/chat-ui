@@ -14,6 +14,7 @@
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
+	import ReasoningProgress from "./ReasoningProgress.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
@@ -130,7 +131,15 @@
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
 
-				{#if hasClientThink}
+				{#if message.reasoningSteps && message.reasoningSteps.length > 0}
+					<ReasoningProgress
+						steps={message.reasoningSteps}
+						currentStatus={message.reasoningStatus}
+						isThinking={message.isThinking || (isLast && loading)}
+						fullContent={message.content.match(/<think>([\s\S]*?)(?:<\/think>|$)/)?.[1] || ""}
+						loading={isLast && loading}
+					/>
+				{:else if hasClientThink}
 					{#each message.content.split(THINK_BLOCK_REGEX) as part, _i}
 						{#if part && part.startsWith("<think>")}
 							{@const isClosed = part.endsWith("</think>")}

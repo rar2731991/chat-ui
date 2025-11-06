@@ -8,8 +8,12 @@
 	import { base } from "$app/paths";
 	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
 	import { findCurrentModel } from "$lib/utils/models";
-	import type { Message } from "$lib/types/Message";
-	import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
+	import type { Message, ReasoningStep } from "$lib/types/Message";
+	import {
+		MessageUpdateStatus,
+		MessageUpdateType,
+		MessageReasoningUpdateType,
+	} from "$lib/types/MessageUpdate";
 	import titleUpdate from "$lib/stores/titleUpdate";
 	import file2base64 from "$lib/utils/file2base64";
 	import { addChildren } from "$lib/utils/tree/addChildren";
@@ -105,6 +109,7 @@
 		messageId?: ReturnType<typeof v4>;
 		isRetry?: boolean;
 	}): Promise<void> {
+		let messageToWriteTo: Message | undefined = undefined;
 		try {
 			$isAborted = false;
 			$loading = true;
@@ -204,7 +209,7 @@
 			}
 
 			const userMessage = messages.find((message) => message.id === messageId);
-			const messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
+			messageToWriteTo = messages.find((message) => message.id === messageToWriteToId);
 			if (!messageToWriteTo) {
 				throw new Error("Message to write to not found");
 			}
@@ -293,6 +298,21 @@
 						route: update.route,
 						model: update.model,
 					};
+				} else if (update.type === MessageUpdateType.Reasoning) {
+					// Handle reasoning updates
+					if (update.subtype === MessageReasoningUpdateType.Stream) {
+						// Add a new reasoning step
+						const newStep: ReasoningStep = {
+							summary: update.token,
+							timestamp: Date.now(),
+						};
+						messageToWriteTo.reasoningSteps = [...(messageToWriteTo.reasoningSteps ?? []), newStep];
+						messageToWriteTo.isThinking = true;
+					} else if (update.subtype === MessageReasoningUpdateType.Status) {
+						// Update reasoning status
+						messageToWriteTo.reasoningStatus = update.status;
+						messageToWriteTo.isThinking = true;
+					}
 				}
 			}
 		} catch (err) {
@@ -309,6 +329,10 @@
 		} finally {
 			$loading = false;
 			pending = false;
+			// Mark reasoning as complete
+			if (messageToWriteTo) {
+				messageToWriteTo.isThinking = false;
+			}
 			await invalidateAll();
 		}
 	}
