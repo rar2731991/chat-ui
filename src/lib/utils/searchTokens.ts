@@ -29,5 +29,5 @@ export function generateQueryTokens(query: string): RegExp[] {
 		.split(/\s+/)
 		.map((word) => word.replace(PUNCTUATION_REGEX, "").toLowerCase())
 		.filter((word) => word.length)
-		.map((token) => new RegExp(`^${escapeForRegExp(token)}`));
+		.map((token) => new RegExp(escapeForRegExp(token)));
 }
