@@ -40,6 +40,7 @@
 		loading?: boolean;
 		pending?: boolean;
 		shared?: boolean;
+		fromShare?: boolean;
 		currentModel: Model;
 		models: Model[];
 		preprompt?: string | undefined;
@@ -57,6 +58,7 @@
 		loading = false,
 		pending = false,
 		shared = false,
+		fromShare = false,
 		currentModel,
 		models,
 		preprompt = undefined,
@@ -335,7 +337,7 @@
 	{/if}
 	<div
 		class="scrollbar-custom h-full overflow-y-auto"
-		use:snapScrollToBottom={scrollSignal}
+		use:snapScrollToBottom={{ dependency: scrollSignal, skipInitialScroll: fromShare }}
 		bind:this={chatContainer}
 	>
 		<div

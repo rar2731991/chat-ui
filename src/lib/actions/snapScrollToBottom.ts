@@ -10,11 +10,25 @@ const waitForAnimationFrame = () =>
 			})
 		: Promise.resolve();
 
+export interface SnapScrollToBottomOptions {
+	dependency: unknown;
+	skipInitialScroll?: boolean;
+}
+
 /**
  * @param node element to snap scroll to bottom
- * @param dependency pass in a dependency to update scroll on changes.
+ * @param options configuration options including dependency and skipInitialScroll flag
  */
-export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
+export const snapScrollToBottom = (
+	node: HTMLElement,
+	options: SnapScrollToBottomOptions | unknown
+) => {
+	// Support both old API (just dependency) and new API (options object)
+	const opts: SnapScrollToBottomOptions =
+		typeof options === "object" && options !== null && "dependency" in options
+			? (options as SnapScrollToBottomOptions)
+			: { dependency: options, skipInitialScroll: false };
+
 	let prevScrollValue = node.scrollTop;
 	let isDetached = false;
 	let resizeObserver: ResizeObserver | undefined;
@@ -73,7 +87,8 @@ export const snapScrollToBottom = (node: HTMLElement, dependency: unknown) => {
 		resizeObserver.observe(target);
 	}
 
-	if (dependency) {
+	// Only scroll to bottom on mount if skipInitialScroll is false
+	if (opts.dependency && !opts.skipInitialScroll) {
 		void updateScroll({ force: true });
 	}
 

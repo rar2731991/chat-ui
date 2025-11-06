@@ -448,6 +448,7 @@
 	messages={messagesPath as Message[]}
 	{messagesAlternatives}
 	shared={data.shared}
+	fromShare={!!page.url.searchParams.get("fromShare")}
 	preprompt={data.preprompt}
 	bind:files
 	onmessage={onMessage}
